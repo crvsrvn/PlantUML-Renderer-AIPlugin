@@ -1,0 +1,20 @@
+{
+  "name": "plantuml-renderer-aiplugin",
+  "interface": {
+    "displayName": "PlantUML Renderer AIPlugin"
+  },
+  "plugins": [
+    {
+      "name": "plantuml-renderer",
+      "source": {
+        "source": "local",
+        "path": "./plugins/plantuml-renderer"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
+    }
+  ]
+}

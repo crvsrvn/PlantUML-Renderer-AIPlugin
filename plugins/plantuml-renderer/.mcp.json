@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "plantuml-renderer": {
+      "command": "node",
+      "args": ["./dist/server.mjs"],
+      "cwd": ".",
+      "startup_timeout_ms": 30000,
+      "env": {
+        "PLANTUML_SECURITY_PROFILE": "SANDBOX"
+      }
+    }
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "name": "PlantUML",
+  "version": "1.2026.6",
+  "source": "https://github.com/plantuml/plantuml/releases/download/v1.2026.6/plantuml-1.2026.6.jar",
+  "sourcePage": "https://github.com/plantuml/plantuml/releases/tag/v1.2026.6",
+  "sha256": "89948f14c93756c7a3fb7b69078ff37e8489fd79dd430c582b931e2f65358690",
+  "license": "GPL",
+  "licenseUrl": "https://plantuml.com/faq",
+  "minimumJavaVersion": 11,
+  "securityProfile": "SANDBOX"
+}

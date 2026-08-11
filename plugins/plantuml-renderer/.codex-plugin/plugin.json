@@ -1,0 +1,35 @@
+{
+  "name": "plantuml-renderer",
+  "version": "1.0.0",
+  "description": "在本机安全地将 PlantUML 源码渲染为 PNG 或 SVG。",
+  "author": {
+    "name": "PlantUML Renderer contributors"
+  },
+  "license": "MIT",
+  "keywords": [
+    "plantuml",
+    "uml",
+    "diagram",
+    "rendering"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "PlantUML 渲染器",
+    "shortDescription": "在本机安全地渲染 PlantUML 图。",
+    "longDescription": "将 PlantUML 源码在本机渲染为 PNG 或 SVG；首次使用时从官方发布页下载并校验固定版本的 PlantUML JAR。",
+    "developerName": "PlantUML Renderer contributors",
+    "category": "Productivity",
+    "capabilities": [
+      "Local rendering",
+      "Verified runtime download",
+      "PNG",
+      "SVG"
+    ],
+    "defaultPrompt": [
+      "把这段 PlantUML 渲染成 SVG。",
+      "根据我的描述生成并渲染 UML 图。",
+      "把这个时序图渲染成 PNG。"
+    ]
+  },
+  "mcpServers": "./.mcp.json"
+}

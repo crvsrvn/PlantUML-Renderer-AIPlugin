@@ -1,0 +1,5 @@
+* text=auto eol=lf
+*.jar binary
+*.png binary
+plugins/plantuml-renderer/dist/server.mjs -whitespace
+plugins/plantuml-renderer/licenses/THIRD_PARTY_LICENSES.txt -whitespace
