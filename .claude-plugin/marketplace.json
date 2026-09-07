@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-marketplace.json",
+  "name": "plantuml-renderer-claude",
+  "owner": {
+    "name": "PlantUML Renderer contributors"
+  },
+  "metadata": {
+    "description": "本地 PlantUML 渲染插件市场（Claude Code 版）。",
+    "version": "1.0.0"
+  },
+  "plugins": [
+    {
+      "name": "plantuml-renderer",
+      "source": "./plugins/plantuml-renderer",
+      "description": "在本机把 PlantUML 源码渲染为 SVG 或 PNG，并可写入 Markdown 文档。",
+      "version": "1.0.0",
+      "author": {
+        "name": "PlantUML Renderer contributors"
+      },
+      "license": "MIT",
+      "category": "productivity",
+      "keywords": ["plantuml", "uml", "diagram", "svg", "markdown"]
+    }
+  ]
+}

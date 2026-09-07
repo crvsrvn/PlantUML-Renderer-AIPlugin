@@ -1,0 +1,19 @@
+{
+  "name": "plantuml-renderer",
+  "version": "1.0.0",
+  "description": "在本机安全地把 PlantUML 源码渲染为 SVG 或 PNG，并可直接嵌入 Markdown 文档。",
+  "author": {
+    "name": "PlantUML Renderer contributors"
+  },
+  "license": "MIT",
+  "keywords": [
+    "plantuml",
+    "uml",
+    "diagram",
+    "rendering",
+    "markdown"
+  ],
+  "commands": "./commands/",
+  "skills": "./skills/",
+  "mcpServers": "./.mcp.claude-code.json"
+}

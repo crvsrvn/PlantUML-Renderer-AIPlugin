@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { constants as fsConstants } from "node:fs";
-import { access, mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
+import { access, mkdir, readFile, readdir, rm, stat, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { spawn } from "node:child_process";
@@ -12,16 +12,27 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { z } from "zod";
 
 import { ensurePlantUmlJar, readPlantUmlMetadata } from "./plantuml-runtime.mjs";
+import {
+  MarkdownEmbedError,
+  buildEmbedBlock,
+  isMarkdownPath,
+  markdownHref,
+  sanitizeAssetName,
+  upsertEmbedBlock
+} from "./markdown-embed.mjs";
 
-const PLUGIN_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const MODULE_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const PLUGIN_ROOT = path.resolve(process.env.PLANTUML_PLUGIN_ROOT?.trim() || MODULE_ROOT);
 const SECURITY_PROFILE = "SANDBOX";
 const MINIMUM_JAVA_VERSION = 11;
 const MAX_SOURCE_BYTES = 256 * 1024;
 const MAX_OUTPUT_BYTES = 12 * 1024 * 1024;
+const MAX_MARKDOWN_BYTES = 4 * 1024 * 1024;
 const MAX_STDERR_BYTES = 64 * 1024;
 const RENDER_TIMEOUT_MS = 30_000;
 const JAVA_CHECK_TIMEOUT_MS = 5_000;
 const MAX_MEMORY_CACHE_ENTRIES = 8;
+const BYTE_ORDER_MARK = String.fromCharCode(0xfeff);
 const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
 const memoryOutputCache = new Map();
 const activeRenders = new Map();
@@ -200,10 +211,35 @@ async function resolvePlantUmlMetadata() {
   }
 }
 
-function resolveDataRoot() {
-  return path.resolve(
-    process.env.PLUGIN_DATA?.trim() || path.join(os.tmpdir(), "plantuml-renderer")
-  );
+/**
+ * Codex 通过 PLUGIN_DATA 提供数据目录；Claude Code 不提供，因此在没有它时
+ * 退回用户级目录，这样插件更新或重装都不会清掉已校验的运行时。
+ */
+export function resolveDataRoot() {
+  const explicit = process.env.PLANTUML_RENDERER_DATA?.trim() || process.env.PLUGIN_DATA?.trim();
+  if (explicit) {
+    return path.resolve(explicit);
+  }
+  const claudeConfigDirectory = process.env.CLAUDE_CONFIG_DIR?.trim();
+  if (claudeConfigDirectory) {
+    return path.resolve(claudeConfigDirectory, "plantuml-renderer");
+  }
+  const home = os.homedir();
+  if (home) {
+    return path.join(home, ".claude", "plantuml-renderer");
+  }
+  return path.join(os.tmpdir(), "plantuml-renderer");
+}
+
+function resolveWorkspaceRoot() {
+  return path.resolve(process.env.PLANTUML_WORKSPACE_ROOT?.trim() || process.cwd());
+}
+
+function resolveUserPath(candidate, label) {
+  if (typeof candidate !== "string" || !candidate.trim()) {
+    throw new RenderError(`${label}不能为空。`);
+  }
+  return path.resolve(resolveWorkspaceRoot(), candidate.trim());
 }
 
 function normalizeSource(source) {
@@ -254,7 +290,7 @@ function collapsiblePlantUmlSource(source) {
 }
 
 function compactDiagnostics(stderr, exitCode) {
-  const diagnostics = stderr.replaceAll("\u0000", "").trim();
+  const diagnostics = stderr.split(String.fromCharCode(0)).join("").trim();
   if (!diagnostics) {
     return `PlantUML 退出码为 ${exitCode}，但没有返回诊断信息。`;
   }
@@ -433,7 +469,16 @@ async function renderOutput({
   }
 }
 
-export async function renderPlantUml({ source, format = "svg", name }) {
+async function writeRenderedCopy(targetPath, format, output) {
+  const extension = path.extname(targetPath).toLowerCase();
+  if (extension !== `.${format}`) {
+    throw new RenderError(`输出文件扩展名必须是 .${format}，实际是 ${extension || "空"}。`);
+  }
+  await writeFile(targetPath, output);
+  return targetPath;
+}
+
+export async function renderPlantUml({ source, format = "svg", name, outputPath }) {
   const startedAt = performance.now();
   const normalizedSource = normalizeSource(source);
   if (!["png", "svg"].includes(format)) {
@@ -458,18 +503,32 @@ export async function renderPlantUml({ source, format = "svg", name }) {
     .update(normalizedSource)
     .digest("hex")
     .slice(0, 16);
-  const outputPath = path.join(outputDirectory, `${sanitizeName(name)}-${digest}.${format}`);
+  const cachePath = path.join(outputDirectory, `${sanitizeName(name)}-${digest}.${format}`);
   const { output, cacheStatus } = await renderOutput({
-    outputPath,
+    outputPath: cachePath,
     format,
     normalizedSource,
     javaCommand: javaRuntime.command,
     jarPath: plantUmlRuntime.path
   });
+
+  let copiedPath;
+  if (outputPath) {
+    const resolvedOutputPath = resolveUserPath(outputPath, "输出路径");
+    const parentDirectory = path.dirname(resolvedOutputPath);
+    if (!(await fileExists(parentDirectory))) {
+      throw new RenderError(`输出目录不存在：${parentDirectory}`);
+    }
+    copiedPath = await writeRenderedCopy(resolvedOutputPath, format, output);
+  }
+
   const mimeType = format === "png" ? "image/png" : "image/svg+xml";
+  const primaryPath = copiedPath ?? cachePath;
   return {
-    path: outputPath,
-    markdown: `![PlantUML 图](${markdownPath(outputPath)})`,
+    path: primaryPath,
+    cachePath,
+    copiedPath,
+    markdown: `![PlantUML 图](${markdownPath(primaryPath)})`,
     format,
     mimeType,
     bytes: output.length,
@@ -484,17 +543,125 @@ export async function renderPlantUml({ source, format = "svg", name }) {
   };
 }
 
+async function resolveMarkdownTarget(markdownPathInput) {
+  const resolved = resolveUserPath(markdownPathInput, "Markdown 路径");
+  if (!isMarkdownPath(resolved)) {
+    throw new RenderError(`目标文件必须是 Markdown（.md/.markdown/.mdx）：${resolved}`);
+  }
+  let stats;
+  try {
+    stats = await stat(resolved);
+  } catch (error) {
+    if (error?.code === "ENOENT") {
+      throw new RenderError(`Markdown 文件不存在：${resolved}`);
+    }
+    throw error;
+  }
+  if (!stats.isFile()) {
+    throw new RenderError(`Markdown 路径不是文件：${resolved}`);
+  }
+  if (stats.size > MAX_MARKDOWN_BYTES) {
+    throw new RenderError(`Markdown 文件超过 ${MAX_MARKDOWN_BYTES / 1024 / 1024} MiB，已跳过。`);
+  }
+  return resolved;
+}
+
+function resolveAssetDirectory(markdownDirectory, assetDirectory) {
+  const resolved = path.resolve(markdownDirectory, assetDirectory ?? ".");
+  const relative = path.relative(markdownDirectory, resolved);
+  if (relative.startsWith("..") || path.isAbsolute(relative)) {
+    throw new RenderError("资源目录必须位于 Markdown 文件所在目录内。");
+  }
+  return resolved;
+}
+
+/**
+ * 渲染并把图片引用写进 Markdown：同名标记块原地更新，因此可以反复重渲染。
+ */
+export async function insertPlantUmlIntoMarkdown({
+  markdownPath: markdownPathInput,
+  source,
+  name,
+  format = "svg",
+  assetDir = ".",
+  anchor,
+  caption,
+  writeSource = true
+}) {
+  const targetPath = await resolveMarkdownTarget(markdownPathInput);
+  const markdownDirectory = path.dirname(targetPath);
+  const id = sanitizeAssetName(name);
+  const assetDirectory = resolveAssetDirectory(markdownDirectory, assetDir);
+
+  const rendered = await renderPlantUml({ source, format, name: id });
+  await mkdir(assetDirectory, { recursive: true });
+  const imagePath = path.join(assetDirectory, `${id}.${format}`);
+  await writeRenderedCopy(imagePath, format, rendered.data);
+
+  let sourcePath;
+  if (writeSource) {
+    sourcePath = path.join(assetDirectory, `${id}.puml`);
+    await writeFile(sourcePath, `${rendered.source}\n`, "utf8");
+  }
+
+  const rawMarkdown = await readFile(targetPath, "utf8");
+  const hasByteOrderMark = rawMarkdown.startsWith(BYTE_ORDER_MARK);
+  const href = markdownHref(markdownDirectory, imagePath);
+  const block = buildEmbedBlock({ id, href, alt: String(name).trim() || id, caption });
+  const { text, action } = upsertEmbedBlock(
+    hasByteOrderMark ? rawMarkdown.slice(BYTE_ORDER_MARK.length) : rawMarkdown,
+    { id, block, anchor }
+  );
+  await writeFile(targetPath, hasByteOrderMark ? `${BYTE_ORDER_MARK}${text}` : text, "utf8");
+
+  return {
+    ...rendered,
+    path: imagePath,
+    markdownPath: targetPath,
+    imagePath,
+    sourcePath,
+    embedId: id,
+    href,
+    action
+  };
+}
+
+function summarizeRender(result) {
+  const lines = [`已生成 ${result.format.toUpperCase()}：${result.path}`];
+  if (result.copiedPath) {
+    lines.push(`缓存副本：${result.cachePath}`);
+  }
+  lines.push(
+    `Markdown：${result.markdown}`,
+    `耗时：${result.durationMs} ms`,
+    `输出缓存：${result.cacheStatus}`,
+    `PlantUML 运行时：${result.runtimeCacheStatus}`,
+    `PlantUML：${result.plantUmlVersion}`,
+    `Java：${result.javaVersion}`,
+    `安全配置：${result.securityProfile}`
+  );
+  return lines;
+}
+
 export function createServer() {
   const server = new McpServer({ name: "plantuml-renderer", version: "1.0.0" });
+
   server.registerTool(
     "render_plantuml",
     {
       title: "渲染 PlantUML",
-      description: "在本机以 SANDBOX 安全配置把 PlantUML 源码渲染为 PNG 或 SVG；首次使用会从官方来源下载并校验固定 JAR。",
+      description:
+        "在本机以 SANDBOX 安全配置把 PlantUML 源码渲染为 SVG 或 PNG；首次使用会从官方来源下载并校验固定 JAR。可选写出到指定路径。",
       inputSchema: {
         source: z.string().describe("包含 @start... 与 @end... 标记的完整 PlantUML 源码。"),
         format: z.enum(["png", "svg"]).default("svg").describe("输出格式。默认使用 SVG。"),
-        name: z.string().trim().min(1).max(80).optional().describe("可选的输出文件基础名称。")
+        name: z.string().trim().min(1).max(80).optional().describe("可选的输出文件基础名称。"),
+        outputPath: z
+          .string()
+          .trim()
+          .min(1)
+          .optional()
+          .describe("可选的落盘路径（绝对路径或相对工作目录），扩展名必须与格式一致；父目录必须已存在。")
       },
       annotations: {
         readOnlyHint: false,
@@ -503,19 +670,10 @@ export function createServer() {
         openWorldHint: true
       }
     },
-    async ({ source, format, name }) => {
+    async ({ source, format, name, outputPath }) => {
       try {
-        const result = await renderPlantUml({ source, format, name });
-        const summaryLines = [
-          `已生成 ${result.format.toUpperCase()}：${result.path}`,
-          `Markdown：${result.markdown}`,
-          `耗时：${result.durationMs} ms`,
-          `输出缓存：${result.cacheStatus}`,
-          `PlantUML 运行时：${result.runtimeCacheStatus}`,
-          `PlantUML：${result.plantUmlVersion}`,
-          `Java：${result.javaVersion}`,
-          `安全配置：${result.securityProfile}`
-        ];
+        const result = await renderPlantUml({ source, format, name, outputPath });
+        const summaryLines = summarizeRender(result);
         if (result.format === "svg") {
           summaryLines.push("", collapsiblePlantUmlSource(result.source));
         }
@@ -533,6 +691,84 @@ export function createServer() {
       }
     }
   );
+
+  server.registerTool(
+    "insert_plantuml_markdown",
+    {
+      title: "渲染并写入 Markdown",
+      description:
+        "渲染 PlantUML 并把图片引用写进已存在的 Markdown 文件：图片和 .puml 源码落在文档目录内，引用包在 plantuml-begin/plantuml-end 标记里，同名图表重复调用会原地更新。",
+      inputSchema: {
+        markdownPath: z
+          .string()
+          .trim()
+          .min(1)
+          .describe("目标 Markdown 文件（绝对路径或相对工作目录），必须已存在。"),
+        source: z.string().describe("包含 @start... 与 @end... 标记的完整 PlantUML 源码。"),
+        name: z
+          .string()
+          .trim()
+          .min(1)
+          .max(80)
+          .describe("图表名称：既是标记块 ID，也是图片与 .puml 的文件名，可用中文。"),
+        format: z.enum(["png", "svg"]).default("svg").describe("输出格式。默认使用 SVG。"),
+        assetDir: z
+          .string()
+          .trim()
+          .min(1)
+          .default(".")
+          .describe("图片存放目录，相对 Markdown 所在目录，必须在其目录内。默认与文档同级。"),
+        anchor: z
+          .string()
+          .trim()
+          .min(1)
+          .optional()
+          .describe("首次插入时的锚点文本（例如某个标题行），图片插到该行之后；缺省追加到文末。"),
+        caption: z.string().trim().min(1).max(200).optional().describe("可选图注。"),
+        writeSource: z
+          .boolean()
+          .default(true)
+          .describe("是否在图片旁写出同名 .puml 源码文件，便于后续重新渲染。")
+      },
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: true
+      }
+    },
+    async (input) => {
+      try {
+        const result = await insertPlantUmlIntoMarkdown(input);
+        const actionText = { replaced: "原地更新", inserted: "锚点插入", appended: "追加到文末" }[result.action];
+        const lines = [
+          `已写入 Markdown：${result.markdownPath}（${actionText}）`,
+          `标记块：<!-- plantuml-begin: ${result.embedId} -->`,
+          `图片：${result.imagePath}`
+        ];
+        if (result.sourcePath) {
+          lines.push(`源码：${result.sourcePath}`);
+        }
+        lines.push(
+          `引用：![${result.embedId}](${result.href})`,
+          `耗时：${result.durationMs} ms`,
+          `输出缓存：${result.cacheStatus}`,
+          `PlantUML：${result.plantUmlVersion}`,
+          `Java：${result.javaVersion}`,
+          `安全配置：${result.securityProfile}`
+        );
+        return { content: [{ type: "text", text: lines.join("\n") }] };
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        const prefix = error instanceof MarkdownEmbedError ? "Markdown 写入失败" : "PlantUML 渲染失败";
+        return {
+          isError: true,
+          content: [{ type: "text", text: `${prefix}：${message}` }]
+        };
+      }
+    }
+  );
+
   return server;
 }
 

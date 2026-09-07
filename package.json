@@ -1,5 +1,5 @@
 {
-  "name": "plantuml-renderer-aiplugin",
+  "name": "plantuml-renderer",
   "version": "1.0.0",
   "private": true,
   "type": "module",

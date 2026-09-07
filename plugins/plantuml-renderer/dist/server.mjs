@@ -3229,8 +3229,8 @@ var require_utils = __commonJS({
       }
       return ind;
     }
-    function removeDotSegments(path3) {
-      let input = path3;
+    function removeDotSegments(path4) {
+      let input = path4;
       const output = [];
       let nextSlash = -1;
       let len = 0;
@@ -3482,8 +3482,8 @@ var require_schemes = __commonJS({
         wsComponent.secure = void 0;
       }
       if (wsComponent.resourceName) {
-        const [path3, query] = wsComponent.resourceName.split("?");
-        wsComponent.path = path3 && path3 !== "/" ? path3 : void 0;
+        const [path4, query] = wsComponent.resourceName.split("?");
+        wsComponent.path = path4 && path4 !== "/" ? path4 : void 0;
         wsComponent.query = query;
         wsComponent.resourceName = void 0;
       }
@@ -6918,9 +6918,9 @@ var require_dist = __commonJS({
 // plugins/plantuml-renderer/scripts/server.mjs
 import { createHash as createHash2 } from "node:crypto";
 import { constants as fsConstants } from "node:fs";
-import { access as access2, mkdir as mkdir2, readFile as readFile2, readdir, rm as rm2, writeFile } from "node:fs/promises";
+import { access as access2, mkdir as mkdir2, readFile as readFile2, readdir, rm as rm2, stat, writeFile } from "node:fs/promises";
 import os from "node:os";
-import path2 from "node:path";
+import path3 from "node:path";
 import { spawn } from "node:child_process";
 import { performance } from "node:perf_hooks";
 import { fileURLToPath } from "node:url";
@@ -7284,8 +7284,8 @@ function getErrorMap() {
 
 // node_modules/zod/v3/helpers/parseUtil.js
 var makeIssue = (params) => {
-  const { data, path: path3, errorMaps, issueData } = params;
-  const fullPath = [...path3, ...issueData.path || []];
+  const { data, path: path4, errorMaps, issueData } = params;
+  const fullPath = [...path4, ...issueData.path || []];
   const fullIssue = {
     ...issueData,
     path: fullPath
@@ -7400,11 +7400,11 @@ var errorUtil;
 
 // node_modules/zod/v3/types.js
 var ParseInputLazyPath = class {
-  constructor(parent, value, path3, key) {
+  constructor(parent, value, path4, key) {
     this._cachedPath = [];
     this.parent = parent;
     this.data = value;
-    this._path = path3;
+    this._path = path4;
     this._key = key;
   }
   get path() {
@@ -11324,10 +11324,10 @@ function mergeDefs(...defs) {
 function cloneDef(schema) {
   return mergeDefs(schema._zod.def);
 }
-function getElementAtPath(obj, path3) {
-  if (!path3)
+function getElementAtPath(obj, path4) {
+  if (!path4)
     return obj;
-  return path3.reduce((acc, key) => acc?.[key], obj);
+  return path4.reduce((acc, key) => acc?.[key], obj);
 }
 function promiseAllObject(promisesObj) {
   const keys = Object.keys(promisesObj);
@@ -11736,11 +11736,11 @@ function explicitlyAborted(x, startIndex = 0) {
   }
   return false;
 }
-function prefixIssues(path3, issues) {
+function prefixIssues(path4, issues) {
   return issues.map((iss) => {
     var _a3;
     (_a3 = iss).path ?? (_a3.path = []);
-    iss.path.unshift(path3);
+    iss.path.unshift(path4);
     return iss;
   });
 }
@@ -11887,16 +11887,16 @@ function flattenError(error51, mapper = (issue2) => issue2.message) {
 }
 function formatError(error51, mapper = (issue2) => issue2.message) {
   const fieldErrors = { _errors: [] };
-  const processError = (error52, path3 = []) => {
+  const processError = (error52, path4 = []) => {
     for (const issue2 of error52.issues) {
       if (issue2.code === "invalid_union" && issue2.errors.length) {
-        issue2.errors.map((issues) => processError({ issues }, [...path3, ...issue2.path]));
+        issue2.errors.map((issues) => processError({ issues }, [...path4, ...issue2.path]));
       } else if (issue2.code === "invalid_key") {
-        processError({ issues: issue2.issues }, [...path3, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path4, ...issue2.path]);
       } else if (issue2.code === "invalid_element") {
-        processError({ issues: issue2.issues }, [...path3, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path4, ...issue2.path]);
       } else {
-        const fullpath = [...path3, ...issue2.path];
+        const fullpath = [...path4, ...issue2.path];
         if (fullpath.length === 0) {
           fieldErrors._errors.push(mapper(issue2));
         } else {
@@ -11923,17 +11923,17 @@ function formatError(error51, mapper = (issue2) => issue2.message) {
 }
 function treeifyError(error51, mapper = (issue2) => issue2.message) {
   const result = { errors: [] };
-  const processError = (error52, path3 = []) => {
+  const processError = (error52, path4 = []) => {
     var _a3, _b;
     for (const issue2 of error52.issues) {
       if (issue2.code === "invalid_union" && issue2.errors.length) {
-        issue2.errors.map((issues) => processError({ issues }, [...path3, ...issue2.path]));
+        issue2.errors.map((issues) => processError({ issues }, [...path4, ...issue2.path]));
       } else if (issue2.code === "invalid_key") {
-        processError({ issues: issue2.issues }, [...path3, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path4, ...issue2.path]);
       } else if (issue2.code === "invalid_element") {
-        processError({ issues: issue2.issues }, [...path3, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path4, ...issue2.path]);
       } else {
-        const fullpath = [...path3, ...issue2.path];
+        const fullpath = [...path4, ...issue2.path];
         if (fullpath.length === 0) {
           result.errors.push(mapper(issue2));
           continue;
@@ -11965,8 +11965,8 @@ function treeifyError(error51, mapper = (issue2) => issue2.message) {
 }
 function toDotPath(_path) {
   const segs = [];
-  const path3 = _path.map((seg) => typeof seg === "object" ? seg.key : seg);
-  for (const seg of path3) {
+  const path4 = _path.map((seg) => typeof seg === "object" ? seg.key : seg);
+  for (const seg of path4) {
     if (typeof seg === "number")
       segs.push(`[${seg}]`);
     else if (typeof seg === "symbol")
@@ -23078,11 +23078,11 @@ function normalizeObjectSchema(schema) {
   }
   return void 0;
 }
-function getDotPath(path3) {
-  if (path3.length === 0) {
+function getDotPath(path4) {
+  if (path4.length === 0) {
     return "object root";
   }
-  return path3.reduce((acc, seg, index) => {
+  return path4.reduce((acc, seg, index) => {
     if (index === 0) {
       return String(seg);
     }
@@ -25107,13 +25107,13 @@ function resolveRef(ref, ctx) {
   if (!ref.startsWith("#")) {
     throw new Error("External $ref is not supported, only local refs (#/...) are allowed");
   }
-  const path3 = ref.slice(1).split("/").filter(Boolean);
-  if (path3.length === 0) {
+  const path4 = ref.slice(1).split("/").filter(Boolean);
+  if (path4.length === 0) {
     return ctx.rootSchema;
   }
   const defsKey = ctx.version === "draft-2020-12" ? "$defs" : "definitions";
-  if (path3[0] === defsKey) {
-    const key = path3[1];
+  if (path4[0] === defsKey) {
+    const key = path4[1];
     if (!key || !ctx.defs[key]) {
       throw new Error(`Reference not found: ${ref}`);
     }
@@ -31272,16 +31272,116 @@ async function ensurePlantUmlJar({
   }
 }
 
+// plugins/plantuml-renderer/scripts/markdown-embed.mjs
+import path2 from "node:path";
+var MAX_ASSET_NAME_LENGTH = 64;
+var WINDOWS_RESERVED_NAME = /^(?:con|prn|aux|nul|com[1-9]|lpt[1-9])$/i;
+var UNSAFE_NAME_CHARACTERS = /[\\/:*?"<>|]+/g;
+var MARKDOWN_EXTENSIONS = /* @__PURE__ */ new Set([".md", ".markdown", ".mdx"]);
+var MarkdownEmbedError = class extends Error {
+};
+function escapeRegExp(text) {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+function replaceControlCharacters(text) {
+  let result = "";
+  for (const character of text) {
+    const codePoint = character.codePointAt(0);
+    result += codePoint < 32 || codePoint === 127 ? "-" : character;
+  }
+  return result;
+}
+function sanitizeAssetName(name) {
+  const sanitized = replaceControlCharacters(String(name ?? "").normalize("NFC")).replace(UNSAFE_NAME_CHARACTERS, "-").replace(/\s+/g, "-").replace(/-{2,}/g, "-").replace(/^[-.]+|[-.]+$/g, "").slice(0, MAX_ASSET_NAME_LENGTH).replace(/^[-.]+|[-.]+$/g, "");
+  if (!sanitized || WINDOWS_RESERVED_NAME.test(sanitized)) {
+    throw new MarkdownEmbedError(`图表名称 ${JSON.stringify(name)} 无法作为文件名使用。`);
+  }
+  return sanitized;
+}
+function isMarkdownPath(filePath) {
+  return MARKDOWN_EXTENSIONS.has(path2.extname(filePath).toLowerCase());
+}
+function markdownHref(fromDirectory, filePath) {
+  const relative = path2.relative(fromDirectory, filePath).replaceAll("\\", "/");
+  const href = relative.startsWith(".") ? relative : `./${relative}`;
+  return encodeURI(href).replaceAll("#", "%23").replaceAll("?", "%3F");
+}
+function buildEmbedBlock({ id, href, alt = id, caption }) {
+  const lines = [`<!-- plantuml-begin: ${id} -->`, `![${alt}](${href})`];
+  if (caption) {
+    lines.push("", `*${caption}*`);
+  }
+  lines.push(`<!-- plantuml-end: ${id} -->`);
+  return lines.join("\n");
+}
+function findEmbedBlock(text, id) {
+  const escapedId = escapeRegExp(id);
+  const pattern = new RegExp(
+    `<!--\\s*plantuml-begin:\\s*${escapedId}\\s*-->[\\s\\S]*?<!--\\s*plantuml-end:\\s*${escapedId}\\s*-->`
+  );
+  const match = pattern.exec(text);
+  if (!match) {
+    return void 0;
+  }
+  return { start: match.index, end: match.index + match[0].length, text: match[0] };
+}
+function insertAfterAnchor(text, block, anchor) {
+  const anchorIndex = text.indexOf(anchor);
+  if (anchorIndex < 0) {
+    throw new MarkdownEmbedError(`Markdown 中找不到锚点文本：${anchor}`);
+  }
+  const lineEnd = text.indexOf("\n", anchorIndex + anchor.length);
+  const insertAt = lineEnd < 0 ? text.length : lineEnd;
+  const head = text.slice(0, insertAt);
+  const tail = text.slice(insertAt).replace(/^\n+/, "");
+  return tail ? `${head}
+
+${block}
+
+${tail}` : `${head}
+
+${block}
+`;
+}
+function upsertEmbedBlock(markdown, { id, block, anchor }) {
+  const usesCrlf = /\r\n/.test(markdown);
+  const normalized = markdown.replaceAll("\r\n", "\n");
+  let action;
+  let updated;
+  const existing = findEmbedBlock(normalized, id);
+  if (existing) {
+    action = "replaced";
+    updated = `${normalized.slice(0, existing.start)}${block}${normalized.slice(existing.end)}`;
+  } else if (anchor) {
+    action = "inserted";
+    updated = insertAfterAnchor(normalized, block, anchor);
+  } else {
+    action = "appended";
+    updated = `${normalized.replace(/\s*$/, "")}
+
+${block}
+`;
+  }
+  if (!updated.endsWith("\n")) {
+    updated = `${updated}
+`;
+  }
+  return { text: usesCrlf ? updated.replaceAll("\n", "\r\n") : updated, action };
+}
+
 // plugins/plantuml-renderer/scripts/server.mjs
-var PLUGIN_ROOT = path2.resolve(path2.dirname(fileURLToPath(import.meta.url)), "..");
+var MODULE_ROOT = path3.resolve(path3.dirname(fileURLToPath(import.meta.url)), "..");
+var PLUGIN_ROOT = path3.resolve(process.env.PLANTUML_PLUGIN_ROOT?.trim() || MODULE_ROOT);
 var SECURITY_PROFILE = "SANDBOX";
 var MINIMUM_JAVA_VERSION = 11;
 var MAX_SOURCE_BYTES = 256 * 1024;
 var MAX_OUTPUT_BYTES = 12 * 1024 * 1024;
+var MAX_MARKDOWN_BYTES = 4 * 1024 * 1024;
 var MAX_STDERR_BYTES = 64 * 1024;
 var RENDER_TIMEOUT_MS = 3e4;
 var JAVA_CHECK_TIMEOUT_MS = 5e3;
 var MAX_MEMORY_CACHE_ENTRIES = 8;
+var BYTE_ORDER_MARK = String.fromCharCode(65279);
 var PNG_SIGNATURE = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
 var memoryOutputCache = /* @__PURE__ */ new Map();
 var activeRenders = /* @__PURE__ */ new Map();
@@ -31309,7 +31409,7 @@ async function findAdoptiumJava(root) {
   }
   const runtimeDirectories = entries.filter((entry) => entry.isDirectory() && /^(jre|jdk)-/i.test(entry.name)).sort((left, right) => right.name.localeCompare(left.name, void 0, { numeric: true }));
   for (const entry of runtimeDirectories) {
-    const candidate = path2.join(root, entry.name, "bin", "java.exe");
+    const candidate = path3.join(root, entry.name, "bin", "java.exe");
     if (await fileExists2(candidate)) {
       return candidate;
     }
@@ -31322,15 +31422,15 @@ async function discoverJavaCommand() {
   }
   if (process.env.JAVA_HOME?.trim()) {
     const executable = process.platform === "win32" ? "java.exe" : "java";
-    const candidate = path2.join(process.env.JAVA_HOME.trim(), "bin", executable);
+    const candidate = path3.join(process.env.JAVA_HOME.trim(), "bin", executable);
     if (await fileExists2(candidate)) {
       return candidate;
     }
   }
   if (process.platform === "win32") {
     const roots = [
-      process.env.ProgramFiles && path2.join(process.env.ProgramFiles, "Eclipse Adoptium"),
-      process.env.LOCALAPPDATA && path2.join(process.env.LOCALAPPDATA, "Programs", "Eclipse Adoptium")
+      process.env.ProgramFiles && path3.join(process.env.ProgramFiles, "Eclipse Adoptium"),
+      process.env.LOCALAPPDATA && path3.join(process.env.LOCALAPPDATA, "Programs", "Eclipse Adoptium")
     ];
     for (const root of roots) {
       const candidate = await findAdoptiumJava(root);
@@ -31441,9 +31541,28 @@ async function resolvePlantUmlMetadata() {
   }
 }
 function resolveDataRoot() {
-  return path2.resolve(
-    process.env.PLUGIN_DATA?.trim() || path2.join(os.tmpdir(), "plantuml-renderer")
-  );
+  const explicit = process.env.PLANTUML_RENDERER_DATA?.trim() || process.env.PLUGIN_DATA?.trim();
+  if (explicit) {
+    return path3.resolve(explicit);
+  }
+  const claudeConfigDirectory = process.env.CLAUDE_CONFIG_DIR?.trim();
+  if (claudeConfigDirectory) {
+    return path3.resolve(claudeConfigDirectory, "plantuml-renderer");
+  }
+  const home = os.homedir();
+  if (home) {
+    return path3.join(home, ".claude", "plantuml-renderer");
+  }
+  return path3.join(os.tmpdir(), "plantuml-renderer");
+}
+function resolveWorkspaceRoot() {
+  return path3.resolve(process.env.PLANTUML_WORKSPACE_ROOT?.trim() || process.cwd());
+}
+function resolveUserPath(candidate, label) {
+  if (typeof candidate !== "string" || !candidate.trim()) {
+    throw new RenderError(`${label}不能为空。`);
+  }
+  return path3.resolve(resolveWorkspaceRoot(), candidate.trim());
 }
 function normalizeSource(source) {
   if (typeof source !== "string") {
@@ -31484,7 +31603,7 @@ function collapsiblePlantUmlSource(source) {
   ].join("\n");
 }
 function compactDiagnostics(stderr, exitCode) {
-  const diagnostics = stderr.replaceAll("\0", "").trim();
+  const diagnostics = stderr.split(String.fromCharCode(0)).join("").trim();
   if (!diagnostics) {
     return `PlantUML 退出码为 ${exitCode}，但没有返回诊断信息。`;
   }
@@ -31649,7 +31768,15 @@ async function renderOutput({
     }
   }
 }
-async function renderPlantUml({ source, format = "svg", name }) {
+async function writeRenderedCopy(targetPath, format, output) {
+  const extension = path3.extname(targetPath).toLowerCase();
+  if (extension !== `.${format}`) {
+    throw new RenderError(`输出文件扩展名必须是 .${format}，实际是 ${extension || "空"}。`);
+  }
+  await writeFile(targetPath, output);
+  return targetPath;
+}
+async function renderPlantUml({ source, format = "svg", name, outputPath }) {
   const startedAt = performance.now();
   const normalizedSource = normalizeSource(source);
   if (!["png", "svg"].includes(format)) {
@@ -31662,21 +31789,33 @@ async function renderPlantUml({ source, format = "svg", name }) {
   const javaRuntime = await resolveJavaRuntime();
   const dataRoot = resolveDataRoot();
   const plantUmlRuntime = await ensurePlantUmlJar({ dataRoot, metadata });
-  const outputDirectory = path2.join(dataRoot, "output");
+  const outputDirectory = path3.join(dataRoot, "output");
   await mkdir2(outputDirectory, { recursive: true });
   const digest = createHash2("sha256").update(metadata.version).update("\0").update(format).update("\0").update(normalizedSource).digest("hex").slice(0, 16);
-  const outputPath = path2.join(outputDirectory, `${sanitizeName(name)}-${digest}.${format}`);
+  const cachePath = path3.join(outputDirectory, `${sanitizeName(name)}-${digest}.${format}`);
   const { output, cacheStatus } = await renderOutput({
-    outputPath,
+    outputPath: cachePath,
     format,
     normalizedSource,
     javaCommand: javaRuntime.command,
     jarPath: plantUmlRuntime.path
   });
+  let copiedPath;
+  if (outputPath) {
+    const resolvedOutputPath = resolveUserPath(outputPath, "输出路径");
+    const parentDirectory = path3.dirname(resolvedOutputPath);
+    if (!await fileExists2(parentDirectory)) {
+      throw new RenderError(`输出目录不存在：${parentDirectory}`);
+    }
+    copiedPath = await writeRenderedCopy(resolvedOutputPath, format, output);
+  }
   const mimeType = format === "png" ? "image/png" : "image/svg+xml";
+  const primaryPath = copiedPath ?? cachePath;
   return {
-    path: outputPath,
-    markdown: `![PlantUML 图](${markdownPath(outputPath)})`,
+    path: primaryPath,
+    cachePath,
+    copiedPath,
+    markdown: `![PlantUML 图](${markdownPath(primaryPath)})`,
     format,
     mimeType,
     bytes: output.length,
@@ -31690,17 +31829,108 @@ async function renderPlantUml({ source, format = "svg", name }) {
     securityProfile: SECURITY_PROFILE
   };
 }
+async function resolveMarkdownTarget(markdownPathInput) {
+  const resolved = resolveUserPath(markdownPathInput, "Markdown 路径");
+  if (!isMarkdownPath(resolved)) {
+    throw new RenderError(`目标文件必须是 Markdown（.md/.markdown/.mdx）：${resolved}`);
+  }
+  let stats;
+  try {
+    stats = await stat(resolved);
+  } catch (error51) {
+    if (error51?.code === "ENOENT") {
+      throw new RenderError(`Markdown 文件不存在：${resolved}`);
+    }
+    throw error51;
+  }
+  if (!stats.isFile()) {
+    throw new RenderError(`Markdown 路径不是文件：${resolved}`);
+  }
+  if (stats.size > MAX_MARKDOWN_BYTES) {
+    throw new RenderError(`Markdown 文件超过 ${MAX_MARKDOWN_BYTES / 1024 / 1024} MiB，已跳过。`);
+  }
+  return resolved;
+}
+function resolveAssetDirectory(markdownDirectory, assetDirectory) {
+  const resolved = path3.resolve(markdownDirectory, assetDirectory ?? ".");
+  const relative = path3.relative(markdownDirectory, resolved);
+  if (relative.startsWith("..") || path3.isAbsolute(relative)) {
+    throw new RenderError("资源目录必须位于 Markdown 文件所在目录内。");
+  }
+  return resolved;
+}
+async function insertPlantUmlIntoMarkdown({
+  markdownPath: markdownPathInput,
+  source,
+  name,
+  format = "svg",
+  assetDir = ".",
+  anchor,
+  caption,
+  writeSource = true
+}) {
+  const targetPath = await resolveMarkdownTarget(markdownPathInput);
+  const markdownDirectory = path3.dirname(targetPath);
+  const id = sanitizeAssetName(name);
+  const assetDirectory = resolveAssetDirectory(markdownDirectory, assetDir);
+  const rendered = await renderPlantUml({ source, format, name: id });
+  await mkdir2(assetDirectory, { recursive: true });
+  const imagePath = path3.join(assetDirectory, `${id}.${format}`);
+  await writeRenderedCopy(imagePath, format, rendered.data);
+  let sourcePath;
+  if (writeSource) {
+    sourcePath = path3.join(assetDirectory, `${id}.puml`);
+    await writeFile(sourcePath, `${rendered.source}
+`, "utf8");
+  }
+  const rawMarkdown = await readFile2(targetPath, "utf8");
+  const hasByteOrderMark = rawMarkdown.startsWith(BYTE_ORDER_MARK);
+  const href = markdownHref(markdownDirectory, imagePath);
+  const block = buildEmbedBlock({ id, href, alt: String(name).trim() || id, caption });
+  const { text, action } = upsertEmbedBlock(
+    hasByteOrderMark ? rawMarkdown.slice(BYTE_ORDER_MARK.length) : rawMarkdown,
+    { id, block, anchor }
+  );
+  await writeFile(targetPath, hasByteOrderMark ? `${BYTE_ORDER_MARK}${text}` : text, "utf8");
+  return {
+    ...rendered,
+    path: imagePath,
+    markdownPath: targetPath,
+    imagePath,
+    sourcePath,
+    embedId: id,
+    href,
+    action
+  };
+}
+function summarizeRender(result) {
+  const lines = [`已生成 ${result.format.toUpperCase()}：${result.path}`];
+  if (result.copiedPath) {
+    lines.push(`缓存副本：${result.cachePath}`);
+  }
+  lines.push(
+    `Markdown：${result.markdown}`,
+    `耗时：${result.durationMs} ms`,
+    `输出缓存：${result.cacheStatus}`,
+    `PlantUML 运行时：${result.runtimeCacheStatus}`,
+    `PlantUML：${result.plantUmlVersion}`,
+    `Java：${result.javaVersion}`,
+    `安全配置：${result.securityProfile}`
+  );
+  return lines;
+}
 function createServer() {
   const server = new McpServer({ name: "plantuml-renderer", version: "1.0.0" });
   server.registerTool(
     "render_plantuml",
     {
       title: "渲染 PlantUML",
-      description: "在本机以 SANDBOX 安全配置把 PlantUML 源码渲染为 PNG 或 SVG；首次使用会从官方来源下载并校验固定 JAR。",
+      description: "在本机以 SANDBOX 安全配置把 PlantUML 源码渲染为 SVG 或 PNG；首次使用会从官方来源下载并校验固定 JAR。可选写出到指定路径。",
       inputSchema: {
         source: external_exports.string().describe("包含 @start... 与 @end... 标记的完整 PlantUML 源码。"),
         format: external_exports.enum(["png", "svg"]).default("svg").describe("输出格式。默认使用 SVG。"),
-        name: external_exports.string().trim().min(1).max(80).optional().describe("可选的输出文件基础名称。")
+        name: external_exports.string().trim().min(1).max(80).optional().describe("可选的输出文件基础名称。"),
+        outputPath: external_exports.string().trim().min(1).optional().describe("可选的落盘路径（绝对路径或相对工作目录），扩展名必须与格式一致；父目录必须已存在。")
       },
       annotations: {
         readOnlyHint: false,
@@ -31709,19 +31939,10 @@ function createServer() {
         openWorldHint: true
       }
     },
-    async ({ source, format, name }) => {
+    async ({ source, format, name, outputPath }) => {
       try {
-        const result = await renderPlantUml({ source, format, name });
-        const summaryLines = [
-          `已生成 ${result.format.toUpperCase()}：${result.path}`,
-          `Markdown：${result.markdown}`,
-          `耗时：${result.durationMs} ms`,
-          `输出缓存：${result.cacheStatus}`,
-          `PlantUML 运行时：${result.runtimeCacheStatus}`,
-          `PlantUML：${result.plantUmlVersion}`,
-          `Java：${result.javaVersion}`,
-          `安全配置：${result.securityProfile}`
-        ];
+        const result = await renderPlantUml({ source, format, name, outputPath });
+        const summaryLines = summarizeRender(result);
         if (result.format === "svg") {
           summaryLines.push("", collapsiblePlantUmlSource(result.source));
         }
@@ -31739,13 +31960,66 @@ function createServer() {
       }
     }
   );
+  server.registerTool(
+    "insert_plantuml_markdown",
+    {
+      title: "渲染并写入 Markdown",
+      description: "渲染 PlantUML 并把图片引用写进已存在的 Markdown 文件：图片和 .puml 源码落在文档目录内，引用包在 plantuml-begin/plantuml-end 标记里，同名图表重复调用会原地更新。",
+      inputSchema: {
+        markdownPath: external_exports.string().trim().min(1).describe("目标 Markdown 文件（绝对路径或相对工作目录），必须已存在。"),
+        source: external_exports.string().describe("包含 @start... 与 @end... 标记的完整 PlantUML 源码。"),
+        name: external_exports.string().trim().min(1).max(80).describe("图表名称：既是标记块 ID，也是图片与 .puml 的文件名，可用中文。"),
+        format: external_exports.enum(["png", "svg"]).default("svg").describe("输出格式。默认使用 SVG。"),
+        assetDir: external_exports.string().trim().min(1).default(".").describe("图片存放目录，相对 Markdown 所在目录，必须在其目录内。默认与文档同级。"),
+        anchor: external_exports.string().trim().min(1).optional().describe("首次插入时的锚点文本（例如某个标题行），图片插到该行之后；缺省追加到文末。"),
+        caption: external_exports.string().trim().min(1).max(200).optional().describe("可选图注。"),
+        writeSource: external_exports.boolean().default(true).describe("是否在图片旁写出同名 .puml 源码文件，便于后续重新渲染。")
+      },
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: true
+      }
+    },
+    async (input) => {
+      try {
+        const result = await insertPlantUmlIntoMarkdown(input);
+        const actionText = { replaced: "原地更新", inserted: "锚点插入", appended: "追加到文末" }[result.action];
+        const lines = [
+          `已写入 Markdown：${result.markdownPath}（${actionText}）`,
+          `标记块：<!-- plantuml-begin: ${result.embedId} -->`,
+          `图片：${result.imagePath}`
+        ];
+        if (result.sourcePath) {
+          lines.push(`源码：${result.sourcePath}`);
+        }
+        lines.push(
+          `引用：![${result.embedId}](${result.href})`,
+          `耗时：${result.durationMs} ms`,
+          `输出缓存：${result.cacheStatus}`,
+          `PlantUML：${result.plantUmlVersion}`,
+          `Java：${result.javaVersion}`,
+          `安全配置：${result.securityProfile}`
+        );
+        return { content: [{ type: "text", text: lines.join("\n") }] };
+      } catch (error51) {
+        const message = error51 instanceof Error ? error51.message : String(error51);
+        const prefix = error51 instanceof MarkdownEmbedError ? "Markdown 写入失败" : "PlantUML 渲染失败";
+        return {
+          isError: true,
+          content: [{ type: "text", text: `${prefix}：${message}` }]
+        };
+      }
+    }
+  );
   return server;
 }
 async function main() {
   const server = createServer();
   await server.connect(new StdioServerTransport());
 }
-var isMainModule = process.argv[1] && path2.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+var isMainModule = process.argv[1] && path3.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
 if (isMainModule) {
   main().catch((error51) => {
     console.error(error51);
@@ -31755,8 +32029,10 @@ if (isMainModule) {
 export {
   RenderError,
   createServer,
+  insertPlantUmlIntoMarkdown,
   parseJavaMajorVersion,
   renderPlantUml,
+  resolveDataRoot,
   resolveJavaCommand,
   resolveJavaRuntime
 };

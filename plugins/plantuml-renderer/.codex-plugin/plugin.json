@@ -1,7 +1,7 @@
 {
   "name": "plantuml-renderer",
   "version": "1.0.0",
-  "description": "在本机安全地将 PlantUML 源码渲染为 PNG 或 SVG。",
+  "description": "在本机安全地把 PlantUML 源码渲染为 SVG 或 PNG，并可直接嵌入 Markdown 文档。",
   "author": {
     "name": "PlantUML Renderer contributors"
   },
@@ -10,26 +10,29 @@
     "plantuml",
     "uml",
     "diagram",
-    "rendering"
+    "rendering",
+    "markdown"
   ],
   "skills": "./skills/",
   "interface": {
     "displayName": "PlantUML 渲染器",
-    "shortDescription": "在本机安全地渲染 PlantUML 图。",
-    "longDescription": "将 PlantUML 源码在本机渲染为 PNG 或 SVG；首次使用时从官方发布页下载并校验固定版本的 PlantUML JAR。",
+    "shortDescription": "在本机安全地渲染 PlantUML 图，并可写入 Markdown。",
+    "longDescription": "将 PlantUML 源码在本机渲染为 SVG 或 PNG，可选落盘到指定路径，也可以直接把图片引用写进已存在的 Markdown 文档；首次使用时从官方发布页下载并校验固定版本的 PlantUML JAR。",
     "developerName": "PlantUML Renderer contributors",
     "category": "Productivity",
     "capabilities": [
       "Local rendering",
       "Verified runtime download",
       "PNG",
-      "SVG"
+      "SVG",
+      "Markdown embedding"
     ],
     "defaultPrompt": [
       "把这段 PlantUML 渲染成 SVG。",
       "根据我的描述生成并渲染 UML 图。",
-      "把这个时序图渲染成 PNG。"
+      "把这个时序图渲染成 PNG。",
+      "把这张状态机图插到 设计.md 的《状态机结构》一节下面。"
     ]
   },
-  "mcpServers": "./.mcp.json"
+  "mcpServers": "./.mcp.codex.json"
 }

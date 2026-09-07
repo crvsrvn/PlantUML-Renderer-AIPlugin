@@ -26,7 +26,7 @@ export async function generateThirdPartyLicenses({ repositoryRoot, outputPath })
     .sort((left, right) => left.localeCompare(right));
 
   const sections = [
-    "PlantUML Renderer AIPlugin - 第三方依赖许可证",
+    "PlantUML Renderer - 第三方依赖许可证",
     "",
     "本文件由 npm run build 根据 package-lock.json 和已安装依赖确定性生成。",
     "PlantUML JAR 不包含在本构建产物中，其声明见仓库根目录 THIRD_PARTY_NOTICES.md。"

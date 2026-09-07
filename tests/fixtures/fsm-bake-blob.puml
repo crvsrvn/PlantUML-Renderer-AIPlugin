@@ -1,0 +1,141 @@
+@startuml
+title FSM Bake 后 Blob（最终 Graph 与武器 Slot）
+top to bottom direction
+skinparam backgroundColor white
+skinparam shadowing false
+skinparam defaultFontName Microsoft YaHei
+skinparam ArrowColor #4B5563
+skinparam classAttributeIconSize 0
+skinparam linetype ortho
+skinparam packageStyle rectangle
+hide methods
+
+package "Bake 输入" {
+  class "角色 Graph 文档" as HeroGraphSource
+  class "武器 Graph Override" as WeaponOverrideSource <<Editor only>>
+  class "武器 Slot 文档" as WeaponSlotSource
+  class "武器最终 Graph 文档" as WeaponGraphSource
+  HeroGraphSource --> WeaponOverrideSource : 编辑期输入
+  WeaponOverrideSource --> WeaponGraphSource : 产出完整 Graph
+}
+
+class "Bake 编译器" as Bake <<compiler>> {
+  +Graph 文档生成 FSMGraphBlob
+  +Slot 文档生成 FSMSlotBlob
+  +校验父子拓扑、Binding、条件深度与固定容量
+  +Slot 禁止 Layer 与嵌套 StateSlot
+  +候选段按 (Priority desc, Order asc, Id asc) 排序
+}
+
+package "Bake 输出" {
+  class ConfigBlobDatabaseSingleton <<existing>>
+
+  class FSMStateMachineBlob <<struct>> {
+    +EntityType : FSMGraphEntityType
+    +States : BlobArray<FSMStateBlob>
+    +StateBindings : BlobArray<FSMStateBindingBlob>
+    +Transitions : BlobArray<FSMTransitionBlob>
+    +Groups : BlobArray<FSMConditionGroupBlob>
+    +Conditions : BlobArray<FSMCondition>
+    +ConditionPayloads : BlobArray<PolyConditionInput>
+    +StateIds : BlobArray<Hash128>
+    +MaxDepth : ushort
+  }
+
+  class FSMGraphBlob <<struct>> {
+    +StateMachine : FSMStateMachineBlob
+    +Layers : BlobArray<FSMLayerBlob>
+    +StateSlots : BlobArray<FSMStateSlotBlob>
+    +ContentHash : Hash128
+  }
+
+  class FSMSlotBlob <<struct>> {
+    +StateMachine : FSMStateMachineBlob
+    +Mappings : BlobArray<FSMSlotMappingBlob>
+    +ContentHash : Hash128
+  }
+
+  class FSMLayerBlob <<struct>> {
+    +RootStateIndex : ushort
+    +CursorIndex : ushort
+  }
+
+  class FSMStateBlob <<struct>> {
+    +ParentStateIndex : ushort
+    +DefaultChildStateIndex : ushort
+    +ExitTransitionStartIndex / Count : ushort
+    +GlobalTransitionStartIndex / Count : ushort
+    +EntryTransitionStartIndex / Count : ushort
+    +StateSlotIndex : ushort
+  }
+
+  class FSMStateBindingBlob <<struct>> {
+    +Skill : FixedString64Bytes
+    +Segment : FixedString64Bytes
+    +IsEmpty : bool
+  }
+
+  class FSMTransitionBlob <<struct>> {
+    +Target : ushort
+    +Mode : FSMConditionMode
+    +Flags : FSMTransitionFlags
+    +Priority : short
+    +Order : ushort
+    +ConditionStartIndex / Count : ushort
+  }
+
+  class FSMConditionGroupBlob <<struct>> {
+    +Mode : FSMConditionMode
+    +ConditionStartIndex / Count : ushort
+  }
+
+  class FSMCondition <<struct>> {
+    +GroupIndex : ushort
+    +PayloadIndex : ushort
+    +Inverted : bool
+  }
+
+  class FSMStateSlotBlob <<struct>> {
+    +Name : FixedString64Bytes
+    +StateIndex : ushort
+  }
+
+  class FSMSlotMappingBlob <<struct>> {
+    +Name : FixedString64Bytes
+    +StateIndex : ushort
+  }
+
+  class PolyConditionInput <<existing struct>>
+
+  FSMGraphBlob *-[#2563EB,thickness=2]-> FSMStateMachineBlob : StateMachine
+  FSMSlotBlob *-[#2563EB,thickness=2]-> FSMStateMachineBlob : StateMachine
+  FSMGraphBlob "1" *--> "1..*" FSMLayerBlob : Layers
+  FSMGraphBlob "1" *--> "0..*" FSMStateSlotBlob : StateSlots
+  FSMSlotBlob "1" *--> "0..*" FSMSlotMappingBlob : Mappings
+  FSMStateMachineBlob "1" *-[#2563EB,thickness=2]-> "0..*" FSMStateBlob : States
+  FSMStateMachineBlob "1" *-[#2563EB,thickness=2]-> "0..*" FSMStateBindingBlob : StateBindings[Index]
+  FSMStateMachineBlob "1" *-[#2563EB,thickness=2]-> "0..*" FSMTransitionBlob : Transitions
+  FSMTransitionBlob "1" *-[#2563EB,thickness=2]-> "0..*" FSMCondition : Condition range
+  FSMCondition --> FSMConditionGroupBlob : GroupIndex
+  FSMCondition --> PolyConditionInput : PayloadIndex
+  FSMTransitionBlob --> FSMStateBlob : Target（所属状态机的局部索引）
+  ConfigBlobDatabaseSingleton --> FSMGraphBlob : ContentHash
+  ConfigBlobDatabaseSingleton --> FSMSlotBlob : ContentHash
+}
+
+HeroGraphSource --> Bake
+WeaponGraphSource --> Bake
+WeaponSlotSource --> Bake
+Bake --> FSMGraphBlob
+Bake --> FSMSlotBlob
+
+legend bottom
+  |= 关键约束 |= 说明 |
+  | 最终 Graph | 角色默认 Graph 与武器 Override 结果都烘焙为完整 FSMGraphBlob |
+  | 武器 Slot | 独立烘焙为 FSMSlotBlob，包含 Mapping 与状态树运行数组 |
+  | 不支持嵌套 | FSMSlotBlob 没有 Layers / StateSlots，所有 StateSlotIndex 为空 |
+  | 索引口径 | Blob 内一律是所属状态机的局部索引；组合索引只存在于 Runtime |
+  | 运行时选择 | FRWeapon.FSMGraph 非空优先，否则 FRHero.FSMGraph |
+  | 零改写 | Runtime 只读取 Blob 并建立 StateSlot 链接，不改写任何 Blob |
+endlegend
+@enduml
