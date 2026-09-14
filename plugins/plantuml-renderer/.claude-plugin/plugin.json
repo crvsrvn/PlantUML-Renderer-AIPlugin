@@ -13,7 +13,6 @@
     "rendering",
     "markdown"
   ],
-  "commands": "./commands/",
   "skills": "./skills/",
   "mcpServers": "./.mcp.claude-code.json"
 }

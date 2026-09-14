@@ -67,7 +67,6 @@ codex plugin add plantuml-renderer@plantuml-renderer-aiplugin
 plugins/plantuml-renderer/
   scripts/                               共享渲染内核（两个平台同一份代码）
   skills/render-plantuml/                共享 Skill
-  commands/                              Claude Code 专属斜杠命令
   .claude-plugin/plugin.json             Claude Code 插件清单
   .codex-plugin/plugin.json              Codex 插件清单
   .mcp.claude-code.json                  Claude Code 的 MCP 启动配置
@@ -75,7 +74,7 @@ plugins/plantuml-renderer/
   dist/server.mjs                        构建产物，两个平台共用
 ```
 
-两份 MCP 配置的差异只是启动方式：Claude Code 用 `${CLAUDE_PLUGIN_ROOT}` 模板变量给出绝对路径；Codex 用相对路径加显式 `cwd`。`commands/` 下的斜杠命令是 Claude Code 特有能力，Codex 清单不引用它们。
+两份 MCP 配置的差异只是启动方式：Claude Code 用 `${CLAUDE_PLUGIN_ROOT}` 模板变量给出绝对路径；Codex 用相对路径加显式 `cwd`。两个平台都只暴露 Skill，没有独立的斜杠命令。
 
 ## 插件提供的能力
 
@@ -83,11 +82,9 @@ plugins/plantuml-renderer/
 |------|------|------|------|
 | MCP 工具 | `render_plantuml` | 渲染 SVG/PNG，可选 `outputPath` 落盘到指定文件 | 两者 |
 | MCP 工具 | `insert_plantuml_markdown` | 渲染后把图片引用写进已存在的 Markdown | 两者 |
-| Skill | `render-plantuml` | 让 AI 在涉及 UML / PlantUML 的请求里自动走本地渲染 | 两者 |
-| 命令 | `/plantuml-renderer:render` | 渲染 `.puml` 文件或一段描述 | Claude Code |
-| 命令 | `/plantuml-renderer:embed` | 渲染并写入指定 Markdown | Claude Code |
+| Skill | `render-plantuml` | 让 AI 在涉及 UML / PlantUML 的场景里自动走本地渲染，不论是用户明确要求还是 AI 自己判断需要配图 | 两者 |
 
-装好之后一般不需要记命令，直接说“把这段 PlantUML 渲染成 SVG”“把这张状态机图插到 `设计.md` 的《状态机结构》一节下面”即可。
+不需要记命令，直接说“把这段 PlantUML 渲染成 SVG”“把这张状态机图插到 `设计.md` 的《状态机结构》一节下面”即可。
 
 ## 写入 Markdown 的约定
 
