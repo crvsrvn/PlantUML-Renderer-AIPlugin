@@ -24,6 +24,16 @@ import {
 const MODULE_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const PLUGIN_ROOT = path.resolve(process.env.PLANTUML_PLUGIN_ROOT?.trim() || MODULE_ROOT);
 const SECURITY_PROFILE = "SANDBOX";
+// 不传 --disable-metadata：让 SVG/PNG 内嵌源码，可用 plantuml -metadata 还原。
+// 这些参数会影响输出内容，同时计入缓存键，参数变化后不会命中旧缓存。
+const RENDER_FLAGS = [
+  "--pipe",
+  "--check-before-run",
+  "--stop-on-error",
+  "--no-error-image",
+  "--charset",
+  "UTF-8"
+];
 const MINIMUM_JAVA_VERSION = 11;
 const MAX_SOURCE_BYTES = 256 * 1024;
 const MAX_OUTPUT_BYTES = 12 * 1024 * 1024;
@@ -443,13 +453,7 @@ async function renderOutput({
         "-jar",
         jarPath,
         `--${format}`,
-        "--pipe",
-        "--check-before-run",
-        "--stop-on-error",
-        "--no-error-image",
-        "--disable-metadata",
-        "--charset",
-        "UTF-8"
+        ...RENDER_FLAGS
       ];
       const result = await runPlantUmlProcess(javaCommand, args, normalizedSource);
       verifyOutput(result.stdout, format);
@@ -499,6 +503,8 @@ export async function renderPlantUml({ source, format = "svg", name, outputPath 
     .update(metadata.version)
     .update("\0")
     .update(format)
+    .update("\0")
+    .update(RENDER_FLAGS.join(" "))
     .update("\0")
     .update(normalizedSource)
     .digest("hex")

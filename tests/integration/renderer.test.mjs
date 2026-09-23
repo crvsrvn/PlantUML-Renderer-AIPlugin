@@ -5,6 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import { performance } from "node:perf_hooks";
 import { fileURLToPath } from "node:url";
+import { inflateRawSync } from "node:zlib";
 
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
@@ -73,6 +74,19 @@ test("默认渲染 SVG 并命中内存缓存", async () => {
   assert.equal(rendered.runtimeCacheStatus, "hit");
   assert.equal(rendered.cacheStatus, "rendered");
   assert.equal(cached.cacheStatus, "memory");
+});
+
+test("SVG 内嵌可还原的 PlantUML 源码", async () => {
+  const body = "Alice -> Bob: 可还原\n' 注释也保留";
+  const result = await renderPlantUml({ source: `@startuml\n${body}\n@enduml`, name: "metadata-svg" });
+  const encoded = result.data.toString("utf8").match(/<\?plantuml-src (\S+)\?>/)?.[1];
+  assert.ok(encoded, "SVG 中缺少 plantuml-src 元数据");
+
+  // PlantUML 使用自定义 base64 字母表 + raw deflate。
+  const plantUmlAlphabet = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz-_";
+  const base64Alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+  const base64 = [...encoded].map((char) => base64Alphabet[plantUmlAlphabet.indexOf(char)]).join("");
+  assert.equal(inflateRawSync(Buffer.from(base64, "base64")).toString("utf8"), body);
 });
 
 test("并发的相同请求会复用同一次渲染", async () => {

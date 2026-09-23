@@ -31373,6 +31373,14 @@ ${block}
 var MODULE_ROOT = path3.resolve(path3.dirname(fileURLToPath(import.meta.url)), "..");
 var PLUGIN_ROOT = path3.resolve(process.env.PLANTUML_PLUGIN_ROOT?.trim() || MODULE_ROOT);
 var SECURITY_PROFILE = "SANDBOX";
+var RENDER_FLAGS = [
+  "--pipe",
+  "--check-before-run",
+  "--stop-on-error",
+  "--no-error-image",
+  "--charset",
+  "UTF-8"
+];
 var MINIMUM_JAVA_VERSION = 11;
 var MAX_SOURCE_BYTES = 256 * 1024;
 var MAX_OUTPUT_BYTES = 12 * 1024 * 1024;
@@ -31744,13 +31752,7 @@ async function renderOutput({
         "-jar",
         jarPath,
         `--${format}`,
-        "--pipe",
-        "--check-before-run",
-        "--stop-on-error",
-        "--no-error-image",
-        "--disable-metadata",
-        "--charset",
-        "UTF-8"
+        ...RENDER_FLAGS
       ];
       const result = await runPlantUmlProcess(javaCommand, args, normalizedSource);
       verifyOutput(result.stdout, format);
@@ -31791,7 +31793,7 @@ async function renderPlantUml({ source, format = "svg", name, outputPath }) {
   const plantUmlRuntime = await ensurePlantUmlJar({ dataRoot, metadata });
   const outputDirectory = path3.join(dataRoot, "output");
   await mkdir2(outputDirectory, { recursive: true });
-  const digest = createHash2("sha256").update(metadata.version).update("\0").update(format).update("\0").update(normalizedSource).digest("hex").slice(0, 16);
+  const digest = createHash2("sha256").update(metadata.version).update("\0").update(format).update("\0").update(RENDER_FLAGS.join(" ")).update("\0").update(normalizedSource).digest("hex").slice(0, 16);
   const cachePath = path3.join(outputDirectory, `${sanitizeName(name)}-${digest}.${format}`);
   const { output, cacheStatus } = await renderOutput({
     outputPath: cachePath,
