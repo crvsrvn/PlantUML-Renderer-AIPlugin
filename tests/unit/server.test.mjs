@@ -25,59 +25,64 @@ test("直接调用渲染 API 时拒绝非字符串源码", async () => {
   await assert.rejects(renderPlantUml({ source: 42 }), /必须是字符串/);
 });
 
-test("数据目录优先使用显式环境变量", () => {
-  const original = process.env.PLANTUML_RENDERER_DATA;
-  const expected = path.join(os.tmpdir(), "plantuml-data-root-test");
-  process.env.PLANTUML_RENDERER_DATA = expected;
-  try {
-    assert.equal(resolveDataRoot(), path.resolve(expected));
-  } finally {
-    if (original === undefined) {
-      delete process.env.PLANTUML_RENDERER_DATA;
+const DATA_ROOT_VARIABLES = [
+  "PLANTUML_RENDERER_DATA",
+  "PLUGIN_DATA",
+  "CLAUDE_PLUGIN_DATA",
+  "LOCALAPPDATA",
+  "XDG_CACHE_HOME"
+];
+
+// 只保留 overrides 中的数据目录变量，执行完毕后恢复原值。
+function withDataRootEnv(overrides, callback) {
+  const originals = Object.fromEntries(DATA_ROOT_VARIABLES.map((name) => [name, process.env[name]]));
+  for (const name of DATA_ROOT_VARIABLES) {
+    if (overrides[name] === undefined) {
+      delete process.env[name];
     } else {
-      process.env.PLANTUML_RENDERER_DATA = original;
+      process.env[name] = overrides[name];
     }
   }
+  try {
+    callback();
+  } finally {
+    for (const [name, value] of Object.entries(originals)) {
+      if (value === undefined) {
+        delete process.env[name];
+      } else {
+        process.env[name] = value;
+      }
+    }
+  }
+}
+
+test("数据目录优先使用显式环境变量", () => {
+  const expected = path.join(os.tmpdir(), "plantuml-data-root-test");
+  withDataRootEnv(
+    { PLANTUML_RENDERER_DATA: expected, PLUGIN_DATA: path.join(os.tmpdir(), "ignored") },
+    () => assert.equal(resolveDataRoot(), path.resolve(expected))
+  );
 });
 
 test("Codex 提供的 PLUGIN_DATA 会被识别为数据目录", () => {
-  const originalData = process.env.PLANTUML_RENDERER_DATA;
-  const originalPluginData = process.env.PLUGIN_DATA;
   const expected = path.join(os.tmpdir(), "plantuml-plugin-data-test");
-  delete process.env.PLANTUML_RENDERER_DATA;
-  process.env.PLUGIN_DATA = expected;
-  try {
+  withDataRootEnv({ PLUGIN_DATA: expected }, () => {
     assert.equal(resolveDataRoot(), path.resolve(expected));
-  } finally {
-    if (originalData !== undefined) {
-      process.env.PLANTUML_RENDERER_DATA = originalData;
-    }
-    if (originalPluginData === undefined) {
-      delete process.env.PLUGIN_DATA;
-    } else {
-      process.env.PLUGIN_DATA = originalPluginData;
-    }
-  }
+  });
 });
 
-test("没有环境变量时数据目录落在用户目录下", () => {
-  const originalData = process.env.PLANTUML_RENDERER_DATA;
-  const originalPluginData = process.env.PLUGIN_DATA;
-  const originalConfigDirectory = process.env.CLAUDE_CONFIG_DIR;
-  delete process.env.PLANTUML_RENDERER_DATA;
-  delete process.env.PLUGIN_DATA;
-  delete process.env.CLAUDE_CONFIG_DIR;
-  try {
-    assert.equal(resolveDataRoot(), path.join(os.homedir(), ".claude", "plantuml-renderer"));
-  } finally {
-    if (originalData !== undefined) {
-      process.env.PLANTUML_RENDERER_DATA = originalData;
-    }
-    if (originalPluginData !== undefined) {
-      process.env.PLUGIN_DATA = originalPluginData;
-    }
-    if (originalConfigDirectory !== undefined) {
-      process.env.CLAUDE_CONFIG_DIR = originalConfigDirectory;
-    }
-  }
+test("Claude Code 提供的 CLAUDE_PLUGIN_DATA 会被识别为数据目录", () => {
+  const expected = path.join(os.tmpdir(), "plantuml-claude-plugin-data-test");
+  withDataRootEnv({ CLAUDE_PLUGIN_DATA: expected }, () => {
+    assert.equal(resolveDataRoot(), path.resolve(expected));
+  });
+});
+
+test("没有宿主数据目录时落在系统约定的用户缓存目录下", () => {
+  const cacheRoot = path.join(os.tmpdir(), "plantuml-user-cache-test");
+  withDataRootEnv({ LOCALAPPDATA: cacheRoot, XDG_CACHE_HOME: cacheRoot }, () => {
+    const expectedRoot =
+      process.platform === "darwin" ? path.join(os.homedir(), "Library", "Caches") : cacheRoot;
+    assert.equal(resolveDataRoot(), path.join(expectedRoot, "plantuml-renderer"));
+  });
 });

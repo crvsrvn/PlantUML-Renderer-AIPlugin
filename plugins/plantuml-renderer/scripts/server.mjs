@@ -21,9 +21,19 @@ import {
   upsertEmbedBlock
 } from "./markdown-embed.mjs";
 
-const MODULE_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const PLUGIN_ROOT = path.resolve(process.env.PLANTUML_PLUGIN_ROOT?.trim() || MODULE_ROOT);
+// scripts/server.mjs 与打包后的 dist/server.mjs 都位于插件根目录下一层，无需宿主注入路径。
+const PLUGIN_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const SECURITY_PROFILE = "SANDBOX";
+// Windows 上各 JDK 发行版在 Program Files 或 %LOCALAPPDATA%\Programs 下的默认厂商目录。
+const WINDOWS_JAVA_VENDOR_DIRECTORIES = [
+  "Eclipse Adoptium",
+  "Java",
+  "Microsoft",
+  "Zulu",
+  "Amazon Corretto",
+  "BellSoft",
+  "Semeru"
+];
 // 不传 --disable-metadata：让 SVG/PNG 内嵌源码，可用 plantuml -metadata 还原。
 // 这些参数会影响输出内容，同时计入缓存键，参数变化后不会命中旧缓存。
 const RENDER_FLAGS = [
@@ -61,57 +71,72 @@ async function fileExists(filePath) {
   }
 }
 
-async function findAdoptiumJava(root) {
-  if (!root || !(await fileExists(root))) {
-    return undefined;
-  }
-
+/**
+ * 在厂商目录下查找 <版本目录>/bin/java.exe，版本目录名倒序，优先较新的版本。
+ */
+async function findJavaExecutables(vendorRoot) {
   let entries;
   try {
-    entries = await readdir(root, { withFileTypes: true });
+    entries = await readdir(vendorRoot, { withFileTypes: true });
   } catch {
-    return undefined;
+    return [];
   }
-  const runtimeDirectories = entries
-    .filter((entry) => entry.isDirectory() && /^(jre|jdk)-/i.test(entry.name))
-    .sort((left, right) => right.name.localeCompare(left.name, undefined, { numeric: true }));
+  const candidates = entries
+    .filter((entry) => entry.isDirectory())
+    .sort((left, right) => right.name.localeCompare(left.name, undefined, { numeric: true }))
+    .map((entry) => path.join(vendorRoot, entry.name, "bin", "java.exe"));
 
-  for (const entry of runtimeDirectories) {
-    const candidate = path.join(root, entry.name, "bin", "java.exe");
+  const found = [];
+  for (const candidate of candidates) {
     if (await fileExists(candidate)) {
-      return candidate;
+      found.push(candidate);
     }
   }
-  return undefined;
+  return found;
 }
 
-async function discoverJavaCommand() {
-  if (process.env.PLANTUML_JAVA?.trim()) {
-    return process.env.PLANTUML_JAVA.trim();
+/**
+ * Windows 上的 JDK 安装器不一定写 PATH / JAVA_HOME，因此按各发行版的默认安装目录补充探测。
+ */
+async function findWindowsJavaExecutables() {
+  const installRoots = [
+    process.env.ProgramFiles,
+    process.env.LOCALAPPDATA && path.join(process.env.LOCALAPPDATA, "Programs")
+  ].filter(Boolean);
+
+  const found = [];
+  for (const installRoot of installRoots) {
+    for (const vendor of WINDOWS_JAVA_VENDOR_DIRECTORIES) {
+      found.push(...(await findJavaExecutables(path.join(installRoot, vendor))));
+    }
+  }
+  return found;
+}
+
+/**
+ * 按优先级返回 Java 候选：PLANTUML_JAVA 显式指定时只用它；否则依次为 JAVA_HOME、
+ * Windows 常见安装目录、PATH 上的 java。
+ */
+async function discoverJavaCommands() {
+  const explicit = process.env.PLANTUML_JAVA?.trim();
+  if (explicit) {
+    return [explicit];
   }
 
-  if (process.env.JAVA_HOME?.trim()) {
+  const candidates = [];
+  const javaHome = process.env.JAVA_HOME?.trim();
+  if (javaHome) {
     const executable = process.platform === "win32" ? "java.exe" : "java";
-    const candidate = path.join(process.env.JAVA_HOME.trim(), "bin", executable);
+    const candidate = path.join(javaHome, "bin", executable);
     if (await fileExists(candidate)) {
-      return candidate;
+      candidates.push(candidate);
     }
   }
-
   if (process.platform === "win32") {
-    const roots = [
-      process.env.ProgramFiles && path.join(process.env.ProgramFiles, "Eclipse Adoptium"),
-      process.env.LOCALAPPDATA && path.join(process.env.LOCALAPPDATA, "Programs", "Eclipse Adoptium")
-    ];
-    for (const root of roots) {
-      const candidate = await findAdoptiumJava(root);
-      if (candidate) {
-        return candidate;
-      }
-    }
+    candidates.push(...(await findWindowsJavaExecutables()));
   }
-
-  return "java";
+  candidates.push("java");
+  return [...new Set(candidates)];
 }
 
 export function parseJavaMajorVersion(output) {
@@ -197,8 +222,23 @@ function inspectJavaRuntime(command) {
   });
 }
 
+/**
+ * 逐个检查候选，返回第一个满足最低版本的 Java；全部失败时报告优先级最高候选的错误。
+ */
+async function findUsableJavaRuntime() {
+  let firstError;
+  for (const command of await discoverJavaCommands()) {
+    try {
+      return await inspectJavaRuntime(command);
+    } catch (error) {
+      firstError ??= error;
+    }
+  }
+  throw firstError;
+}
+
 export async function resolveJavaRuntime() {
-  javaRuntimePromise ??= (async () => inspectJavaRuntime(await discoverJavaCommand()))();
+  javaRuntimePromise ??= findUsableJavaRuntime();
   try {
     return await javaRuntimePromise;
   } catch (error) {
@@ -222,23 +262,40 @@ async function resolvePlantUmlMetadata() {
 }
 
 /**
- * Codex 通过 PLUGIN_DATA 提供数据目录；Claude Code 不提供，因此在没有它时
- * 退回用户级目录，这样插件更新或重装都不会清掉已校验的运行时。
+ * 操作系统约定的用户级缓存目录：Windows 为 %LOCALAPPDATA%，macOS 为 ~/Library/Caches，
+ * 其他平台遵循 XDG（$XDG_CACHE_HOME 或 ~/.cache）。
  */
-export function resolveDataRoot() {
-  const explicit = process.env.PLANTUML_RENDERER_DATA?.trim() || process.env.PLUGIN_DATA?.trim();
-  if (explicit) {
-    return path.resolve(explicit);
-  }
-  const claudeConfigDirectory = process.env.CLAUDE_CONFIG_DIR?.trim();
-  if (claudeConfigDirectory) {
-    return path.resolve(claudeConfigDirectory, "plantuml-renderer");
+function resolveUserCacheRoot() {
+  const localAppData = process.env.LOCALAPPDATA?.trim();
+  if (process.platform === "win32" && localAppData) {
+    return localAppData;
   }
   const home = os.homedir();
-  if (home) {
-    return path.join(home, ".claude", "plantuml-renderer");
+  if (!home) {
+    return os.tmpdir();
   }
-  return path.join(os.tmpdir(), "plantuml-renderer");
+  if (process.platform === "win32") {
+    return path.join(home, "AppData", "Local");
+  }
+  if (process.platform === "darwin") {
+    return path.join(home, "Library", "Caches");
+  }
+  return process.env.XDG_CACHE_HOME?.trim() || path.join(home, ".cache");
+}
+
+/**
+ * 数据目录优先级：显式覆盖 → 宿主提供的插件数据目录（Codex 为 PLUGIN_DATA，
+ * Claude Code 为 CLAUDE_PLUGIN_DATA，二者都在插件更新后保留）→ 用户级缓存目录。
+ */
+export function resolveDataRoot() {
+  const configured = [
+    process.env.PLANTUML_RENDERER_DATA,
+    process.env.PLUGIN_DATA,
+    process.env.CLAUDE_PLUGIN_DATA
+  ]
+    .map((value) => value?.trim())
+    .find(Boolean);
+  return path.resolve(configured || path.join(resolveUserCacheRoot(), "plantuml-renderer"));
 }
 
 function resolveWorkspaceRoot() {

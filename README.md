@@ -8,7 +8,7 @@
 
 1. 插件检查 Java 运行时，要求 Java 11 或更高版本。
 2. 首次渲染时，从 PlantUML 官方 GitHub Release 下载固定版本的 `plantuml.jar`。
-3. 下载必须通过固定 SHA-256 校验，然后原子写入数据目录：Codex 会提供 `PLUGIN_DATA`；Claude Code 不提供，插件回退到用户级目录（默认 `~/.claude/plantuml-renderer`），这样插件更新或重装不会清掉运行时。
+3. 下载必须通过固定 SHA-256 校验，然后原子写入数据目录：优先使用宿主提供的插件数据目录（Codex 为 `PLUGIN_DATA`，Claude Code 为 `CLAUDE_PLUGIN_DATA`），二者在插件更新后都会保留；都没有时回退到系统约定的用户缓存目录，见[环境变量](#环境变量)。
 4. 之后的渲染直接复用已校验的本地 JAR。
 5. PlantUML 始终以 `SANDBOX` 安全配置、headless 模式和资源上限运行。
 
@@ -21,43 +21,44 @@
 - Java 11 或更高版本
 - Linux / macOS 上部分图类型需要 Graphviz
 
-可以用 `PLANTUML_JAVA` 指定 Java 可执行文件，也可以走标准的 `JAVA_HOME` 或 `PATH`。
+Java 按以下顺序查找，取第一个满足版本要求的：`PLANTUML_JAVA`（指定后只用它）→ `JAVA_HOME` → Windows 下常见发行版的默认安装目录（`Program Files` 或 `%LOCALAPPDATA%\Programs` 下的 Eclipse Adoptium、Java、Microsoft、Zulu、Amazon Corretto、BellSoft、Semeru）→ `PATH` 上的 `java`。
 
 ## 安装
 
-### Claude Code
-
-```bash
-claude plugin marketplace add E:\Repositories\PlantUML-Renderer-AIPlugin
-claude plugin install plantuml-renderer@plantuml-renderer-claude
-```
-
-安装后用 `/mcp` 或 `claude mcp list` 确认 `plantuml-renderer` 已连接，再开始新的对话。桌面版对应的是 `/plugin marketplace add` / `/plugin install` 斜杠命令。
-
-### Codex
-
-```powershell
-codex plugin marketplace add "E:\Repositories\PlantUML-Renderer-AIPlugin"
-codex plugin add plantuml-renderer@plantuml-renderer-aiplugin
-```
-
-安装后开始新的 Codex 任务，直接要求它生成或渲染 PlantUML 图即可。
-
-### 通过 Git 分享
-
-仓库推到 Git 服务后，接收方直接添加仓库市场：
+### 从 GitHub 安装
 
 ```bash
 # Claude Code
-claude plugin marketplace add OWNER/PlantUML-Renderer-AIPlugin
+claude plugin marketplace add crvsrvn/PlantUML-Renderer-AIPlugin
 claude plugin install plantuml-renderer@plantuml-renderer-claude
 
 # Codex
-codex plugin marketplace add OWNER/PlantUML-Renderer-AIPlugin --ref main
+codex plugin marketplace add crvsrvn/PlantUML-Renderer-AIPlugin --ref main
 codex plugin add plantuml-renderer@plantuml-renderer-aiplugin
 ```
 
-把 `OWNER` 换成实际的 GitHub 组织或用户名，也可以传 HTTPS / SSH 地址。`dist/server.mjs` 和 `licenses/` 是构建产物但必须提交到仓库，因为安装过程不会执行 `npm install`。
+也可以把 `crvsrvn/PlantUML-Renderer-AIPlugin` 换成 fork 后的 `<owner>/<repo>`，或完整的 HTTPS / SSH 地址。
+
+### 从本地目录安装
+
+适合开发或离线分发。先把仓库克隆或解压到任意目录，再把 `<仓库目录>` 换成该目录的路径：
+
+```bash
+# Claude Code
+claude plugin marketplace add <仓库目录>
+claude plugin install plantuml-renderer@plantuml-renderer-claude
+
+# Codex
+codex plugin marketplace add <仓库目录>
+codex plugin add plantuml-renderer@plantuml-renderer-aiplugin
+```
+
+### 安装后
+
+- Claude Code：用 `/mcp` 或 `claude mcp list` 确认 `plantuml-renderer` 已连接，再开始新的对话。桌面版对应的是 `/plugin marketplace add` / `/plugin install` 斜杠命令。
+- Codex：开始新的任务，直接要求它生成或渲染 PlantUML 图即可。
+
+`dist/server.mjs` 和 `licenses/` 是构建产物但必须提交到仓库，因为安装过程不会执行 `npm install`。插件不依赖安装位置，所有路径都在运行时由宿主变量或脚本自身位置推导。
 
 ## 目录结构
 
@@ -108,10 +109,12 @@ plugins/plantuml-renderer/
 | 变量 | 作用 |
 |------|------|
 | `PLANTUML_JAVA` | 指定 Java 可执行文件路径 |
-| `PLANTUML_RENDERER_DATA` | 覆盖 JAR 与渲染缓存目录，优先级高于 `PLUGIN_DATA` |
-| `PLUGIN_DATA` | Codex 自动提供的数据目录；Claude Code 不提供 |
+| `PLANTUML_RENDERER_DATA` | 覆盖 JAR 与渲染缓存目录，优先级最高 |
+| `PLUGIN_DATA` | Codex 自动提供的数据目录 |
+| `CLAUDE_PLUGIN_DATA` | Claude Code 自动提供的数据目录（`~/.claude/plugins/data/<插件 ID>/`） |
 | `PLANTUML_WORKSPACE_ROOT` | 相对路径参数的解析基准，默认是 MCP 服务的工作目录 |
-| `PLANTUML_PLUGIN_ROOT` | 插件根目录；`.mcp.claude-code.json` 从 `${CLAUDE_PLUGIN_ROOT}` 注入，Codex 侧不需要设置 |
+
+以上数据目录变量都未设置时，回退到系统约定的用户缓存目录下的 `plantuml-renderer`：Windows 为 `%LOCALAPPDATA%`，macOS 为 `~/Library/Caches`，Linux 为 `$XDG_CACHE_HOME`（默认 `~/.cache`）。
 
 ## 开发与验证
 

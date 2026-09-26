@@ -246,7 +246,7 @@ export async function ensurePlantUmlJar({
     throw new PlantUmlRuntimeError("当前 Node.js 运行时不支持 fetch。");
   }
   if (!dataRoot || typeof dataRoot !== "string") {
-    throw new PlantUmlRuntimeError("PLUGIN_DATA 目录无效。");
+    throw new PlantUmlRuntimeError("PlantUML 数据目录无效。");
   }
   if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) {
     throw new PlantUmlRuntimeError("PlantUML 下载超时设置无效。");

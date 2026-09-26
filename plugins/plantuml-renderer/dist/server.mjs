@@ -31234,7 +31234,7 @@ async function ensurePlantUmlJar({
     throw new PlantUmlRuntimeError("当前 Node.js 运行时不支持 fetch。");
   }
   if (!dataRoot || typeof dataRoot !== "string") {
-    throw new PlantUmlRuntimeError("PLUGIN_DATA 目录无效。");
+    throw new PlantUmlRuntimeError("PlantUML 数据目录无效。");
   }
   if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) {
     throw new PlantUmlRuntimeError("PlantUML 下载超时设置无效。");
@@ -31370,9 +31370,17 @@ ${block}
 }
 
 // plugins/plantuml-renderer/scripts/server.mjs
-var MODULE_ROOT = path3.resolve(path3.dirname(fileURLToPath(import.meta.url)), "..");
-var PLUGIN_ROOT = path3.resolve(process.env.PLANTUML_PLUGIN_ROOT?.trim() || MODULE_ROOT);
+var PLUGIN_ROOT = path3.resolve(path3.dirname(fileURLToPath(import.meta.url)), "..");
 var SECURITY_PROFILE = "SANDBOX";
+var WINDOWS_JAVA_VENDOR_DIRECTORIES = [
+  "Eclipse Adoptium",
+  "Java",
+  "Microsoft",
+  "Zulu",
+  "Amazon Corretto",
+  "BellSoft",
+  "Semeru"
+];
 var RENDER_FLAGS = [
   "--pipe",
   "--check-before-run",
@@ -31405,49 +31413,54 @@ async function fileExists2(filePath) {
     return false;
   }
 }
-async function findAdoptiumJava(root) {
-  if (!root || !await fileExists2(root)) {
-    return void 0;
-  }
+async function findJavaExecutables(vendorRoot) {
   let entries;
   try {
-    entries = await readdir(root, { withFileTypes: true });
+    entries = await readdir(vendorRoot, { withFileTypes: true });
   } catch {
-    return void 0;
+    return [];
   }
-  const runtimeDirectories = entries.filter((entry) => entry.isDirectory() && /^(jre|jdk)-/i.test(entry.name)).sort((left, right) => right.name.localeCompare(left.name, void 0, { numeric: true }));
-  for (const entry of runtimeDirectories) {
-    const candidate = path3.join(root, entry.name, "bin", "java.exe");
+  const candidates = entries.filter((entry) => entry.isDirectory()).sort((left, right) => right.name.localeCompare(left.name, void 0, { numeric: true })).map((entry) => path3.join(vendorRoot, entry.name, "bin", "java.exe"));
+  const found = [];
+  for (const candidate of candidates) {
     if (await fileExists2(candidate)) {
-      return candidate;
+      found.push(candidate);
     }
   }
-  return void 0;
+  return found;
 }
-async function discoverJavaCommand() {
-  if (process.env.PLANTUML_JAVA?.trim()) {
-    return process.env.PLANTUML_JAVA.trim();
+async function findWindowsJavaExecutables() {
+  const installRoots = [
+    process.env.ProgramFiles,
+    process.env.LOCALAPPDATA && path3.join(process.env.LOCALAPPDATA, "Programs")
+  ].filter(Boolean);
+  const found = [];
+  for (const installRoot of installRoots) {
+    for (const vendor of WINDOWS_JAVA_VENDOR_DIRECTORIES) {
+      found.push(...await findJavaExecutables(path3.join(installRoot, vendor)));
+    }
   }
-  if (process.env.JAVA_HOME?.trim()) {
+  return found;
+}
+async function discoverJavaCommands() {
+  const explicit = process.env.PLANTUML_JAVA?.trim();
+  if (explicit) {
+    return [explicit];
+  }
+  const candidates = [];
+  const javaHome = process.env.JAVA_HOME?.trim();
+  if (javaHome) {
     const executable = process.platform === "win32" ? "java.exe" : "java";
-    const candidate = path3.join(process.env.JAVA_HOME.trim(), "bin", executable);
+    const candidate = path3.join(javaHome, "bin", executable);
     if (await fileExists2(candidate)) {
-      return candidate;
+      candidates.push(candidate);
     }
   }
   if (process.platform === "win32") {
-    const roots = [
-      process.env.ProgramFiles && path3.join(process.env.ProgramFiles, "Eclipse Adoptium"),
-      process.env.LOCALAPPDATA && path3.join(process.env.LOCALAPPDATA, "Programs", "Eclipse Adoptium")
-    ];
-    for (const root of roots) {
-      const candidate = await findAdoptiumJava(root);
-      if (candidate) {
-        return candidate;
-      }
-    }
+    candidates.push(...await findWindowsJavaExecutables());
   }
-  return "java";
+  candidates.push("java");
+  return [...new Set(candidates)];
 }
 function parseJavaMajorVersion(output) {
   const quoted = output.match(/version\s+"([^"]+)"/i)?.[1];
@@ -31527,8 +31540,19 @@ function inspectJavaRuntime(command) {
     });
   });
 }
+async function findUsableJavaRuntime() {
+  let firstError;
+  for (const command of await discoverJavaCommands()) {
+    try {
+      return await inspectJavaRuntime(command);
+    } catch (error51) {
+      firstError ??= error51;
+    }
+  }
+  throw firstError;
+}
 async function resolveJavaRuntime() {
-  javaRuntimePromise ??= (async () => inspectJavaRuntime(await discoverJavaCommand()))();
+  javaRuntimePromise ??= findUsableJavaRuntime();
   try {
     return await javaRuntimePromise;
   } catch (error51) {
@@ -31548,20 +31572,30 @@ async function resolvePlantUmlMetadata() {
     throw error51;
   }
 }
-function resolveDataRoot() {
-  const explicit = process.env.PLANTUML_RENDERER_DATA?.trim() || process.env.PLUGIN_DATA?.trim();
-  if (explicit) {
-    return path3.resolve(explicit);
-  }
-  const claudeConfigDirectory = process.env.CLAUDE_CONFIG_DIR?.trim();
-  if (claudeConfigDirectory) {
-    return path3.resolve(claudeConfigDirectory, "plantuml-renderer");
+function resolveUserCacheRoot() {
+  const localAppData = process.env.LOCALAPPDATA?.trim();
+  if (process.platform === "win32" && localAppData) {
+    return localAppData;
   }
   const home = os.homedir();
-  if (home) {
-    return path3.join(home, ".claude", "plantuml-renderer");
+  if (!home) {
+    return os.tmpdir();
   }
-  return path3.join(os.tmpdir(), "plantuml-renderer");
+  if (process.platform === "win32") {
+    return path3.join(home, "AppData", "Local");
+  }
+  if (process.platform === "darwin") {
+    return path3.join(home, "Library", "Caches");
+  }
+  return process.env.XDG_CACHE_HOME?.trim() || path3.join(home, ".cache");
+}
+function resolveDataRoot() {
+  const configured = [
+    process.env.PLANTUML_RENDERER_DATA,
+    process.env.PLUGIN_DATA,
+    process.env.CLAUDE_PLUGIN_DATA
+  ].map((value) => value?.trim()).find(Boolean);
+  return path3.resolve(configured || path3.join(resolveUserCacheRoot(), "plantuml-renderer"));
 }
 function resolveWorkspaceRoot() {
   return path3.resolve(process.env.PLANTUML_WORKSPACE_ROOT?.trim() || process.cwd());

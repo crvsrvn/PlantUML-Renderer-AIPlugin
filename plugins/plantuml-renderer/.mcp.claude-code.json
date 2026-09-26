@@ -4,8 +4,7 @@
       "command": "node",
       "args": ["${CLAUDE_PLUGIN_ROOT}/dist/server.mjs"],
       "env": {
-        "PLANTUML_SECURITY_PROFILE": "SANDBOX",
-        "PLANTUML_PLUGIN_ROOT": "${CLAUDE_PLUGIN_ROOT}"
+        "PLANTUML_SECURITY_PROFILE": "SANDBOX"
       }
     }
   }
